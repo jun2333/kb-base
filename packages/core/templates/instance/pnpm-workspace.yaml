@@ -1,0 +1,6 @@
+# pnpm 配置：允许哪些依赖运行构建脚本（pnpm 11 的写法，缺了会报 ERR_PNPM_IGNORED_BUILDS）
+allowBuilds:
+  esbuild: true
+  onnxruntime-node: false
+  protobufjs: true
+  puppeteer: true

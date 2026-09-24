@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# 构建产物
+dist/
+packages/*/dist/
+
+# 日志
+*.log
+pnpm-debug.log*
+
+# 环境变量
+.env
+.env.local
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# VitePress
+**/.vitepress/cache/
+**/.vitepress/dist/
+**/.vitepress/.temp/

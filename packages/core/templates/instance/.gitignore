@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+**/.vitepress/cache/
+**/.vitepress/dist/
+**/.vitepress/.temp/
+
+# 本地数据（向量库 / 索引清单 / 评估历史与基线）
+data/chroma/
+data/index-manifest.json
+data/eval-history.jsonl
+data/eval-baseline.json
+data/gen-eval-report.md
+
+# 评估集生成初稿与可疑清单（待人工审核，不入库）
+eval/retrieval-cases.generated.json
+eval/retrieval-cases.suspects.json
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs / Editor / OS
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

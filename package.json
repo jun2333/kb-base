@@ -1,0 +1,15 @@
+{
+  "name": "kb-base",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "本地知识库基座：RAG 引擎 + Agent + 评估框架 + VitePress 站点能力（@kb/core / @kb/site）",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm -r build",
+    "sync:starter": "node scripts/sync-starter.mjs"
+  }
+}
