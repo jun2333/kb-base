@@ -12,16 +12,16 @@ import { CONTENT_DIR } from './config/loader.js'
 //   kb init <目录> [--name 名称] [--collection 集合名] [--port 3000]
 //                [--local <基座目录>] [--yes] [--force] [--install]
 //
-// 骨架**自包含**（含首页与快速上手文章），所以只装 @kb/core 就能跑，
-// 不需要先有 @kb/site。生成的实例依赖里会同时写上 @kb/core 与 @kb/site。
+// 骨架**自包含**（含首页与快速上手文章），所以只装 @minijun/kb-core 就能跑，
+// 不需要先有 @minijun/kb-site。生成的实例依赖里会同时写上这两个包。
 //
-// 依赖写法默认是**版本号**（读 @kb/core 自己的版本，两个包同仓库同版本发布）；
-// 基座还没发布到 npm 时用 --local <基座目录>，改成指向本地基座的路径依赖。
+// 依赖写法默认是**版本号**（读 @minijun/kb-core 自己的版本，两个包同仓库同版本发布）；
+// 想在本地基座源码上开发 / 调试、而不装 npm 上的发布版，用 --local <基座目录>。
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const TEMPLATE = path.resolve(__dirname, '../templates/instance')
 
-/** @kb/core 自己的版本（读自身 package.json） */
+/** @minijun/kb-core 自己的版本（读自身 package.json） */
 const CORE_VERSION: string = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf-8'),
 ).version
@@ -53,16 +53,16 @@ const str = (v: unknown, fallback: string) => (typeof v === 'string' && v ? v : 
 /** 依赖写法：--local 时指向本地基座，否则写版本号 */
 function buildDeps(local: string | undefined) {
   if (!local) {
-    // 两个包同仓库、同版本发布，都取 @kb/core 自己的版本
-    return { '@kb/core': `^${CORE_VERSION}`, '@kb/site': `^${CORE_VERSION}` }
+    // 两个包同仓库、同版本发布，都取 @minijun/kb-core 自己的版本
+    return { '@minijun/kb-core': `^${CORE_VERSION}`, '@minijun/kb-site': `^${CORE_VERSION}` }
   }
   const base = path.resolve(process.cwd(), local)
   if (!fs.existsSync(path.join(base, 'packages/core'))) {
     throw new Error(`--local 指向的目录里没有 packages/core：${base}`)
   }
   return {
-    '@kb/core': `link:${path.join(base, 'packages/core')}`,
-    '@kb/site': `link:${path.join(base, 'packages/site')}`,
+    '@minijun/kb-core': `link:${path.join(base, 'packages/core')}`,
+    '@minijun/kb-site': `link:${path.join(base, 'packages/site')}`,
   }
 }
 
@@ -100,8 +100,8 @@ function writeConfig(target: string, o: Record<string, string>) {
   fs.writeFileSync(
     path.join(target, 'knowledge.config.mjs'),
     `// 知识库实例配置（唯一入口）。
-// 类型提示来自基座包 @kb/core。
-/** @type {import('@kb/core/types').KnowledgeConfig} */
+// 类型提示来自基座包 @minijun/kb-core。
+/** @type {import('@minijun/kb-core/types').KnowledgeConfig} */
 export default {
   name: ${JSON.stringify(o.name)},
 
@@ -183,6 +183,19 @@ function writeHome(target: string, o: Record<string, string>) {
   fs.writeFileSync(file, src.replaceAll('{{name}}', () => o.name), 'utf-8')
 }
 
+/**
+ * 骨架里的 `.gitignore` 在模板里叫 `gitignore`（没有点）。
+ *
+ * 原因：npm 打包时**无条件排除 `.gitignore`** —— 连写进 package.json 的 `files`
+ * 显式指定也救不回来（实测过 npm 和 pnpm 都一样）。所以只能换个名字上架，
+ * 复制到实例后再改回来。**别把模板里那个文件改回带点的名字**，否则发布后
+ * 每个新实例都会缺 .gitignore（node_modules / data/chroma / .env 全都不忽略）。
+ */
+function restoreGitignore(target: string) {
+  const from = path.join(target, 'gitignore')
+  if (fs.existsSync(from)) fs.renameSync(from, path.join(target, '.gitignore'))
+}
+
 export async function runInit(argv: string[]): Promise<void> {
   const args = parseArgs(argv)
 
@@ -224,6 +237,7 @@ export async function runInit(argv: string[]): Promise<void> {
     fs.mkdirSync(abs, { recursive: true })
     // 骨架自包含（含快速上手文章），不依赖任何已安装的包
     fs.cpSync(TEMPLATE, abs, { recursive: true })
+    restoreGitignore(abs)
 
     fs.writeFileSync(
       path.join(abs, 'package.json'),

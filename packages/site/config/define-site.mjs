@@ -163,7 +163,7 @@ export function defineSite({
 
     vite: {
       // 主题来自 workspace/npm 包，SSR 阶段需要内联处理
-      ssr: { noExternal: ['@kb/site'] },
+      ssr: { noExternal: ['@minijun/kb-site'] },
     },
   })
 }

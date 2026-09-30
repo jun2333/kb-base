@@ -52,9 +52,6 @@ importers:
       openai:
         specifier: ^4.70.0
         version: 4.104.0(ws@8.21.3)(zod@3.25.76)
-      tsx:
-        specifier: ^4.19.0
-        version: 4.23.15
       vitepress:
         specifier: ^1.6.4
         version: 1.6.4(@algolia/client-search@5.59.0)(@types/node@26.6.2)(axios@1.20.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0))(postcss@8.5.28)(search-insights@2.17.3)(typescript@5.9.3)
@@ -71,6 +68,9 @@ importers:
       '@types/koa__router':
         specifier: ^12.0.4
         version: 12.0.5
+      tsx:
+        specifier: ^4.19.0
+        version: 4.23.15
       typescript:
         specifier: ^5.6.0
         version: 5.9.3

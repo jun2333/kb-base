@@ -1,6 +1,6 @@
 # 快速上手：搭一个你自己的知识库
 
-> `@kb/*` 是一套**基座**：把一堆 Markdown 笔记，变成一个可浏览、可搜索、**可对话**的网站。
+> `@minijun/kb-*` 是一套**基座**：把一堆 Markdown 笔记，变成一个可浏览、可搜索、**可对话**的网站。
 >
 > **默认全部在你自己电脑上跑**（本地模型 + 本地向量库）：不花钱、不联网、数据不出本机。
 > 需要时也可以切到**远程大模型 / 远程向量库**，只改配置、不用改代码。
@@ -53,14 +53,14 @@ flowchart LR
 
 ### ① 装包
 
-只装**一个包**就够了（`@kb/core` 提供 CLI，装完就有 `kb` 命令）：
+只装**一个包**就够了（`@minijun/kb-core` 提供 CLI，装完就有 `kb` 命令）：
 
 ```bash
 mkdir my-kb && cd my-kb
-pnpm add @kb/core
+pnpm add @minijun/kb-core
 ```
 
-> 不想装进项目？也可以全局装：`pnpm add -g @kb/core`。
+> 不想装进项目？也可以全局装：`pnpm add -g @minijun/kb-core`。
 > 但**日常在实例里推荐用 `pnpm kb <子命令>`** —— 它走的是实例自己依赖里的版本，
 > 不会和全局版本搞混（全局那套只用来 `kb init`）。
 
@@ -73,10 +73,10 @@ pnpm kb init --install
 它会在当前目录生成实例骨架：`knowledge.config.mjs`（配置）+ `docs/`（含首页与快速上手）+ `package.json` 脚本
 + `.env.example`（环境变量示例，接远程模型 / 向量库时才用得上）。
 
-骨架是**自包含**的，所以刚才只装了 `@kb/core` 也能完整生成；实例真正需要的两个依赖
-（`@kb/core` + `@kb/site`）由它自动写好，你不用管。`--install` 会顺带把依赖装好。
+骨架是**自包含**的，所以刚才只装了 `@minijun/kb-core` 也能完整生成；实例真正需要的两个依赖
+（`@minijun/kb-core` + `@minijun/kb-site`）由它自动写好，你不用管。`--install` 会顺带把依赖装好。
 
-> **基座还没发布到 npm 时**（本地开发阶段），加 `--local` 指向本地基座目录：
+> **想在本地基座源码上开发 / 调试**（不装 npm 上的发布版），加 `--local` 指向基座目录：
 > `pnpm kb init --local ../kb-base --install`
 >
 > 也支持生成到子目录（`pnpm kb init my-kb`）；不加 `--yes` 时会交互式问你几个问题。

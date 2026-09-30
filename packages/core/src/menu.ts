@@ -16,12 +16,12 @@ const MENU_FILE = 'menu.config.mjs'
 const INSTANCE_ROOT = path.dirname(config.docsPath)
 
 /**
- * 解析实例里安装的 @kb/site（core 不依赖它，靠运行时从实例解析 —— 和 `kb dev` 调 vitepress 同理）。
- * 菜单/侧边栏的推导规则只在 @kb/site 里实现一份，避免两处规则不一致。
+ * 解析实例里安装的 @minijun/kb-site（core 不依赖它，靠运行时从实例解析 —— 和 `kb dev` 调 vitepress 同理）。
+ * 菜单/侧边栏的推导规则只在 @minijun/kb-site 里实现一份，避免两处规则不一致。
  */
 async function loadSiteMenu() {
   const require = createRequire(path.join(INSTANCE_ROOT, 'package.json'))
-  const resolved = require.resolve('@kb/site/config/menu.mjs')
+  const resolved = require.resolve('@minijun/kb-site/config/menu.mjs')
   return import(pathToFileURL(resolved).href) as Promise<{
     MENU_FILE: string
     hasMenuConfig: (root: string) => boolean
@@ -33,10 +33,10 @@ async function loadSiteMenu() {
   }>
 }
 
-/** 解析实例的 @kb/site/config/local-only.mjs（用于 --check 跳过「仅本地」内容） */
+/** 解析实例的 @minijun/kb-site/config/local-only.mjs（用于 --check 跳过「仅本地」内容） */
 async function loadLocalOnly() {
   const require = createRequire(path.join(INSTANCE_ROOT, 'package.json'))
-  const resolved = require.resolve('@kb/site/config/local-only.mjs')
+  const resolved = require.resolve('@minijun/kb-site/config/local-only.mjs')
   return import(pathToFileURL(resolved).href) as Promise<{
     resolveLocalEntries: (paths: string[], contentRoot: string) => Array<{ path: string; isFile?: boolean }>
   }>

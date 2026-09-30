@@ -1,31 +1,52 @@
 {
-  "name": "@kb/core",
+  "name": "@minijun/kb-core",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "本地知识库基座：RAG 引擎 + Agent + 评估框架 + CLI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jun2333/kb-base.git",
+    "directory": "packages/core"
+  },
   "bin": {
     "kb": "./bin/kb.mjs"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./types": "./src/config/types.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/config/types.d.ts",
+      "default": "./dist/config/types.js"
+    },
     "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "types": [
+        "./dist/config/types.d.ts"
+      ]
+    }
   },
   "files": [
     "bin",
-    "src",
+    "dist",
     "templates",
-    "eval",
-    "tsconfig.json",
-    "tsconfig.build.json"
+    "eval"
   ],
   "engines": {
     "node": ">=20.6"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm build"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",
@@ -41,14 +62,14 @@
     "koa": "^2.15.0",
     "koa-bodyparser": "^4.4.1",
     "langchain": "^0.3.0",
-    "openai": "^4.70.0",
-    "tsx": "^4.19.0"
+    "openai": "^4.70.0"
   },
   "devDependencies": {
     "@types/koa": "^2.15.0",
     "@types/koa-bodyparser": "^4.3.12",
     "@types/koa__cors": "^5.0.0",
     "@types/koa__router": "^12.0.4",
+    "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   },
   "peerDependencies": {

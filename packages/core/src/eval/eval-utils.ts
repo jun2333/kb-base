@@ -78,7 +78,7 @@ export function requireCasesFile(pathname: string, what: string): string {
   console.error('   评估集是**基座侧**用来校准检索/回答质量的，实例不需要自己准备。')
   console.error('   确实想跑的话，两种办法：')
   console.error(`     • 让它基于你的内容自动出题：kb cases:gen${what.includes('生成') ? '' : ' + kb cases:review'}`)
-  console.error('     • 或参考 @kb/core 的 eval/REVIEW-PLAYBOOK.md 手写一份')
+  console.error('     • 或参考 @minijun/kb-core 的 eval/REVIEW-PLAYBOOK.md 手写一份')
   console.error('')
   process.exit(1)
 }

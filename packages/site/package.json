@@ -1,9 +1,14 @@
 {
-  "name": "@kb/site",
+  "name": "@minijun/kb-site",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "本地知识库基座：VitePress 主题、批注与 AI 组件、站点配置派生",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jun2333/kb-base.git",
+    "directory": "packages/site"
+  },
   "exports": {
     ".": "./config/define-site.mjs",
     "./theme": "./theme/index.js",
@@ -15,6 +20,9 @@
     "theme",
     "config"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "highlight.js": "^11.11.1",
     "mermaid": "^11.15.0"

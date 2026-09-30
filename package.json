@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "本地知识库基座：RAG 引擎 + Agent + 评估框架 + VitePress 站点能力（@kb/core / @kb/site）",
+  "description": "本地知识库基座：RAG 引擎 + Agent + 评估框架 + VitePress 站点能力（@minijun/kb-core / @minijun/kb-site）",
   "engines": {
     "node": ">=20.6"
   },
