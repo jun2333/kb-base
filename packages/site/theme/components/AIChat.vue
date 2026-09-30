@@ -3,6 +3,9 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useData } from 'vitepress'
 import { useAIChat } from '../composables/useAIChat.ts'
 import { usePanelState } from '../composables/usePanelState.js'
+// ⚠️ highlight.js 的 `lib/*` 是 CJS，浏览器不能直接加载（会报 does not provide an export
+//    named 'default'）。靠 config/define-site.mjs 把本包 exclude 出 Vite 的预打包、
+//    让这些深层导入被按需预打包来兜住 —— 改这里的导入方式时顺手确认那边。
 import hljs from 'highlight.js/lib/core'
 import javascript from 'highlight.js/lib/languages/javascript'
 import typescript from 'highlight.js/lib/languages/typescript'

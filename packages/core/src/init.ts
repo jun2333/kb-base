@@ -17,6 +17,13 @@ import { CONTENT_DIR } from './config/loader.js'
 //
 // 依赖写法默认是**版本号**（读 @minijun/kb-core 自己的版本，两个包同仓库同版本发布）；
 // 想在本地基座源码上开发 / 调试、而不装 npm 上的发布版，用 --local <基座目录>。
+//
+// ⚠️ 调用方式：要引导用户用 `npx kb init` 而不是 `pnpm kb init`。
+// pnpm 在执行脚本前会做一次依赖状态检查（内部跑 pnpm install），而实例刚装进来的依赖里
+// 有带 install 脚本的包（protobufjs ← chromadb），pnpm 默认不执行它们并报
+// ERR_PNPM_IGNORED_BUILDS → 检查失败 → **本函数根本不会被调用**。
+// npx 只是在 node_modules/.bin 里找 kb 执行，不经过这层检查。
+// （骨架里的 pnpm-workspace.yaml 带 allowBuilds，生成之后就都正常了。）
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const TEMPLATE = path.resolve(__dirname, '../templates/instance')
@@ -253,7 +260,7 @@ export async function runInit(argv: string[]): Promise<void> {
     console.log(`   cd ${target}`)
     console.log('   pnpm install')
     console.log(`   pnpm chroma:start          # 启动本实例自己的向量库容器（端口 ${chromaPort}，需 Docker）`)
-    console.log('   ollama pull qwen3:8b && ollama pull bge-m3')
+    console.log('   pnpm ollama:pull           # 按配置拉取本地模型（配远程模型会自动跳过）')
     console.log('   pnpm kb index              # 建立索引')
     console.log('   pnpm dev                   # 启动（文档 5173 / API 3000）')
 

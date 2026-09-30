@@ -60,15 +60,26 @@ mkdir my-kb && cd my-kb
 pnpm add @minijun/kb-core
 ```
 
-> 不想装进项目？也可以全局装：`pnpm add -g @minijun/kb-core`。
-> 但**日常在实例里推荐用 `pnpm kb <子命令>`** —— 它走的是实例自己依赖里的版本，
-> 不会和全局版本搞混（全局那套只用来 `kb init`）。
+> **结尾如果报 `ERR_PNPM_IGNORED_BUILDS`（说 `protobufjs` 的构建脚本被忽略了）—— 可以无视**，
+> 包已经装好了。下面 ② 会生成一份 `pnpm-workspace.yaml` 把这件事定下来，之后就不再报。
+>
+> 也支持全局装（`pnpm add -g @minijun/kb-core`），但那样实例里的版本容易和全局混，不推荐。
 
 ### ② 用 `kb` 初始化
 
 ```bash
-pnpm kb init --install
+npx kb init --install
 ```
+
+⚠️ **这里必须写 `npx`，不能写 `pnpm kb init`。**
+
+`pnpm <脚本>` 在执行前会先做一次依赖状态检查（内部跑 `pnpm install`）。① 那步留下的
+「有构建脚本未批准」状态会让这次检查直接失败，于是 `kb` 根本没启动 —— 你会看到
+`Command failed with exit code 1: pnpm install`。
+`npx` 只是在 `node_modules/.bin` 里找到 `kb` 执行，不经过这层检查。
+
+（生成出骨架之后就没事了：`pnpm-workspace.yaml` 里的 `allowBuilds` 会让后续所有
+`pnpm install` / `pnpm kb xxx` 正常工作。）
 
 它会在当前目录生成实例骨架：`knowledge.config.mjs`（配置）+ `docs/`（含首页与快速上手）+ `package.json` 脚本
 + `.env.example`（环境变量示例，接远程模型 / 向量库时才用得上）。
@@ -77,9 +88,9 @@ pnpm kb init --install
 （`@minijun/kb-core` + `@minijun/kb-site`）由它自动写好，你不用管。`--install` 会顺带把依赖装好。
 
 > **想在本地基座源码上开发 / 调试**（不装 npm 上的发布版），加 `--local` 指向基座目录：
-> `pnpm kb init --local ../kb-base --install`
+> `npx kb init --local ../kb-base --install`
 >
-> 也支持生成到子目录（`pnpm kb init my-kb`）；不加 `--yes` 时会交互式问你几个问题。
+> 也支持生成到子目录（`npx kb init my-kb`）；不加 `--yes` 时会交互式问你几个问题。
 
 ### ③ 放你的内容，然后跑起来
 
@@ -220,7 +231,7 @@ pnpm kb import ~/old-notes             # 真的导入
 | `pnpm ollama:pull` / `pnpm ollama:stop` | 按配置拉取本地模型 / 停止本地模型（配远程模型会自动跳过） |
 | `pnpm kb import <目录>` | 把已有笔记导入 `docs/imported/`（`--dry-run` 只预检） |
 | `pnpm build` | 构建静态站点（生产） |
-| `pnpm kb init [目录]` | 生成一个新的知识库实例 |
+| `npx kb init [目录]` | 生成一个新的知识库实例（**必须用 `npx`**，原因见上面「②」） |
 
 ## 五、本地放两个实例（互不干扰）
 

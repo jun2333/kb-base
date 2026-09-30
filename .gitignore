@@ -23,3 +23,5 @@ pnpm-debug.log*
 **/.vitepress/cache/
 **/.vitepress/dist/
 **/.vitepress/.temp/
+
+code.bak

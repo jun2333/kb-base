@@ -1,10 +1,65 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { defineConfig } from 'vitepress'
 import { buildNav } from './nav.mjs'
 import { buildDefaultMenu } from './menu.mjs'
 import { resolveLocalEntries, deriveLocalOnly } from './local-only.mjs'
+
+const require = createRequire(import.meta.url)
+
+/**
+ * highlight.js 的深层导入清单，转成**绝对路径**。
+ *
+ * 为什么非得是绝对路径：`theme/components/AIChat.vue` 里 import 的
+ * `highlight.js/lib/core` 等是 CJS，而 highlight.js 的 `es/*.js` 只是
+ * 「薄 ESM 包装 + import CJS 的 lib/」—— Node 能 interop，**浏览器不能**，
+ * 直接发给浏览器会报 `does not provide an export named 'default'` 并整站白屏。
+ * 所以必须让 Vite 预打包（esbuild 做 CJS→ESM 互操作）。
+ *
+ * 而 `optimizeDeps.include` 的条目是**从项目根解析**的，highlight.js 只软链在
+ * 本包自己的 node_modules 里（实例根没有），用裸包名会报
+ * `Failed to resolve dependency` → 白屏照旧。
+ * 所以这里从本包自身位置解析出绝对路径再交给 Vite。
+ *
+ * 生产构建走 Rollup（自带 commonjs 互操作），不依赖这段，但留着无害。
+ */
+const HLJS_LANGUAGES = [
+  'javascript',
+  'typescript',
+  'python',
+  'css',
+  'xml',
+  'bash',
+  'json',
+  'less',
+  'scss',
+  'yaml',
+  'markdown',
+  'go',
+  'rust',
+  'java',
+]
+
+/**
+ * 解析 highlight.js 在本包下的真实位置（它只软链在本包自己的 node_modules 里，
+ * 实例根解析不到）。返回包根目录 + 需要预打包的 ESM 入口。
+ */
+function resolveHljs() {
+  try {
+    const root = path.dirname(require.resolve('highlight.js/package.json'))
+    return {
+      root,
+      include: [
+        path.join(root, 'es', 'core.js'),
+        ...HLJS_LANGUAGES.map((l) => path.join(root, 'es', 'languages', `${l}.js`)),
+      ],
+    }
+  } catch {
+    return { root: null, include: null }
+  }
+}
 
 // 基座：由「实例配置」生成 VitePress 站点配置。
 // 实例的 docs/.vitepress/config.mts 只需几行：defineSite({ config, menu, metaUrl })。
@@ -71,6 +126,8 @@ function filterSidebar(sidebar, { excludeLocal, sidebarKeys, links }) {
  *   includeLocal?: boolean,
  * }} options
  */
+const hljs = resolveHljs()
+
 export function defineSite({
   config = {},
   menu = null,
@@ -164,6 +221,31 @@ export function defineSite({
     vite: {
       // 主题来自 workspace/npm 包，SSR 阶段需要内联处理
       ssr: { noExternal: ['@minijun/kb-site'] },
+
+      // highlight.js 的 es/ 是「薄 ESM 包装 + import CJS 的 lib/」的 dual-package 写法：
+      //   es/core.js  →  import HighlightJS from '../lib/core.js'
+      // Node 能对 CJS 做 interop，**浏览器不能** —— 把 lib/core.js 当 ESM 发给浏览器会报
+      //   "does not provide an export named 'default'"，整站白屏。
+      //
+      // 所以主题不能被当成「预打包依赖」：那时 Vite 不往里扫，highlight.js 会被原样发给浏览器。
+      // exclude 掉之后 Vite 按**源码**处理主题，主题里的 `highlight.js/lib/core` 会相对主题自身
+      // 解析（命中 site 包私有 node_modules 里的软链）并被按需预打包 → esbuild 做 CJS→ESM 互操作。
+      // 这也正是本地 link: 联调时能正常工作的原因。
+      //
+      // ⚠️ 注意别改成 `optimizeDeps.include: ['highlight.js/lib/core']` —— 实测行不通：
+      // include 的条目是**从项目根**解析的，而 highlight.js 只软链在 site 包自己的
+      // node_modules 里（不在实例根），会报 "Failed to resolve dependency"。
+      // 只影响 dev：生产构建走 Rollup（自带 commonjs 互操作）。
+      // 让 highlight.js 从**任何位置**都能解析 —— 它只是本包的依赖，软链在
+      // node_modules/.pnpm/... 里，实例根解析不到；而 optimizeDeps.include 的条目
+      // 是从项目根解析的（裸包名会报 Failed to resolve dependency）。
+      // 有了 alias 之后，include 和 AIChat.vue 里的裸导入都会命中同一个绝对路径。
+      ...(hljs.root
+        ? {
+            resolve: { alias: { 'highlight.js': hljs.root } },
+            optimizeDeps: { include: hljs.include },
+          }
+        : {}),
     },
   })
 }

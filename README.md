@@ -23,10 +23,20 @@
 
 ```bash
 mkdir my-kb && cd my-kb
-pnpm add @minijun/kb-core               # ① 只装这一个包（提供 kb 命令）
-pnpm kb init --install          # ② 生成实例骨架（自包含，不依赖别的包）
-pnpm kb index && pnpm dev       # ③ 索引 + 启动
+pnpm add @minijun/kb-core        # ① 只装这一个包（提供 kb 命令）
+npx kb init --install            # ② 生成实例骨架（注意：用 npx，不是 pnpm）
+pnpm kb index && pnpm dev        # ③ 索引 + 启动
 ```
+
+> **② 为什么必须是 `npx` 而不是 `pnpm`**：`pnpm <脚本>` 在执行前会先做一次依赖状态检查
+> （内部跑 `pnpm install`），而 ① 装进来的依赖里有带 install 脚本的包（`protobufjs`，来自
+> chromadb 的 gRPC 客户端），pnpm 默认不执行它们并报 `ERR_PNPM_IGNORED_BUILDS` →
+> 检查失败 → **`kb` 根本没启动**。`npx` 只是在 `node_modules/.bin` 里找到 `kb` 执行，
+> 不经过这层检查。
+>
+> ① 结尾那个 `ERR_PNPM_IGNORED_BUILDS` **可以无视**（包已经装好了）；等 ② 生成出骨架
+> （里面有 `pnpm-workspace.yaml` 的 `allowBuilds`），后续的 `pnpm install` / `pnpm kb xxx`
+> 就都正常了。
 
 实例真正需要的两个依赖（`@minijun/kb-core` + `@minijun/kb-site`）由 `kb init` 自动写进 `package.json`，
 **使用者不需要手写包名**；《快速上手》文章也随骨架一起生成到实例的 `docs/getting-started/`。
