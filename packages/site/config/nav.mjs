@@ -1,57 +1,33 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { isContentDir, listContentDirs } from './sidebar.mjs'
-import { linkToPath } from './local-only.mjs'
+import { isContentDir, listContentDirs, DEFAULT_LABELS } from './sidebar.mjs'
 
 // nav 处理（基座）。
-// - 线上构建时过滤带 onlyLocal 的项（分组或叶子均可标记）；
+// - 线上构建时过滤掉"落在仅本地路径下"的项（路径来自 knowledge.config.mjs 的 site.onlyLocal）；
 // - 过滤后若某分组只剩 1 项，则把该项直接提到顶层（用子项自己的名字与链接）；
-// - `site.nav` 缺省时用 buildAutoNav 生成极简导航（首页 + 前几个内容目录）。
-//
-// nav 同时是「仅本地」的唯一来源：带 onlyLocal 的项由 collectLocalPaths 收集，
-// 供 srcExclude / sidebar 过滤 / 死链忽略使用（见 local-only.mjs），无需另维护列表。
+// - 没有 menu.config.mjs 时用 buildAutoNav 生成默认菜单（一级目录各一项）。
 
-/** 去掉内部标记，避免泄漏进 VitePress 配置 */
+/** 去掉内部标记（仅本地已改为配置驱动，这里只是防止旧配置里的字段泄漏进 VitePress） */
 function strip(item) {
   const { onlyLocal, ...rest } = item
   return rest
 }
 
-/**
- * 收集 nav 中标记为「仅本地」的路径（唯一来源）。
- * onlyLocal 支持：路径字符串 / 路径数组 / true（退化为按该项 link 推导）。
- * @param {Array<Record<string, any>>} nav
- * @returns {string[]}
- */
-export function collectLocalPaths(nav) {
-  const out = []
-  const push = (v) => {
-    if (typeof v === 'string') out.push(v)
-    else if (Array.isArray(v)) v.forEach((x) => typeof x === 'string' && out.push(x))
-  }
-  const walk = (item) => {
-    if (!item) return
-    if (item.onlyLocal === true) {
-      if (item.link) out.push(linkToPath(item.link))
-    } else {
-      push(item.onlyLocal)
-    }
-    for (const c of item.items ?? []) walk(c)
-  }
-  for (const item of nav ?? []) walk(item)
-  return out
+/** 该 link 是否落在仅本地前缀下（线上隐藏它） */
+function hitPrefix(link, prefixes) {
+  const l = String(link ?? '').replace(/\/+$/, '')
+  return prefixes.some((p) => l === p || l.startsWith(p + '/'))
 }
 
 /**
- * 处理导航：过滤仅本地项 + 单项分组提到顶层。
+ * 处理导航：过滤落在仅本地路径下的项 + 单项分组提到顶层。
  * @param {Array<Record<string, any>>} nav
- * @param {{ excludeLocal?: boolean }} options
+ * @param {{ excludeLocal?: boolean, hiddenPrefixes?: string[] }} options
  */
-export function buildNav(nav, { excludeLocal = false } = {}) {
+export function buildNav(nav, { excludeLocal = false, hiddenPrefixes = [] } = {}) {
   const source = Array.isArray(nav) ? nav : []
   const result = []
-
-  const hidden = (item) => excludeLocal && Boolean(item.onlyLocal)
+  const hidden = (item) => excludeLocal && hitPrefix(item?.link, hiddenPrefixes)
 
   for (const raw of source) {
     if (hidden(raw)) continue
@@ -75,18 +51,17 @@ export function buildNav(nav, { excludeLocal = false } = {}) {
 }
 
 /**
- * 缺省导航：首页 + 前 N 个内容目录（各链到其第一个文档）。
- * 供没有 site.nav 的新实例开箱即用。
+ * 默认导航：**一级目录 = 菜单项**（各链到该目录的默认页：index.md → 没有就取第一篇）。
+ * 不含「首页」—— 点站点标题/logo 就是回首页。
+ * 不设条数上限：目录多就该显示多，静默少几个会让人完全不知道为什么。
  */
-export function buildAutoNav({ contentRoot, exclude = [], labels = {}, max = 6 } = {}) {
-  const nav = [{ text: '首页', link: '/' }]
+export function buildAutoNav({ contentRoot, labels = {} } = {}) {
+  const nav = []
   if (!contentRoot || !fs.existsSync(contentRoot)) return nav
 
   for (const name of listContentDirs(contentRoot)) {
-    if (exclude.includes(name)) continue
     const first = firstDoc(path.join(contentRoot, name))
-    if (first !== null) nav.push({ text: labels[name] ?? humanize(name), link: `/${name}/${first}` })
-    if (nav.length >= max) break
+    if (first !== null) nav.push({ text: labels[name] ?? DEFAULT_LABELS[name] ?? humanize(name), link: `/${name}/${first}` })
   }
   return nav
 }

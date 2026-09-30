@@ -212,9 +212,9 @@ function scrollToBottom() {
 </script>
 
 <template>
-  <!-- 遮罩层：放在容器外面，和 .ai-chat 是兄弟关系 -->
+  <!-- 遮罩层：放在容器外面，和 .ai-chat 是兄弟关系（样式与层级见 custom.css 的 .kb-overlay） -->
   <Transition name="fade">
-    <div v-if="isOpen" class="ai-chat-overlay" @click="handleClose" />
+    <div v-if="isOpen" class="kb-overlay" @click="handleClose" />
   </Transition>
 
   <div class="ai-chat">
@@ -378,16 +378,6 @@ function scrollToBottom() {
   right: 24px;
   z-index: 1001;
   font-family: var(--vp-font-family-base);
-}
-
-.ai-chat-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.15);
-  z-index: 999;
 }
 
 .ai-chat-trigger-disabled {

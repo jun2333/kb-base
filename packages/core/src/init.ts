@@ -1,9 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRequire } from 'node:module'
 import readline from 'node:readline/promises'
 import { spawnSync } from 'node:child_process'
+import { findFreePort } from './docker.js'
+import { CONTENT_DIR } from './config/loader.js'
 
 // kb init —— 从骨架生成一个全新的知识库实例（唯一的对外路径）。
 //
@@ -11,8 +12,11 @@ import { spawnSync } from 'node:child_process'
 //   kb init <目录> [--name 名称] [--collection 集合名] [--port 3000]
 //                [--local <基座目录>] [--yes] [--force] [--install]
 //
-// 生成的依赖默认写**版本号**（直接读 @kb/core / @kb/site 自己的版本）；
-// 基座还没发布到 npm 时用 --local <基座目录>，改成指向本地基座的依赖。
+// 骨架**自包含**（含首页与快速上手文章），所以只装 @kb/core 就能跑，
+// 不需要先有 @kb/site。生成的实例依赖里会同时写上 @kb/core 与 @kb/site。
+//
+// 依赖写法默认是**版本号**（读 @kb/core 自己的版本，两个包同仓库同版本发布）；
+// 基座还没发布到 npm 时用 --local <基座目录>，改成指向本地基座的路径依赖。
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const TEMPLATE = path.resolve(__dirname, '../templates/instance')
@@ -21,23 +25,6 @@ const TEMPLATE = path.resolve(__dirname, '../templates/instance')
 const CORE_VERSION: string = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf-8'),
 ).version
-
-/**
- * @kb/site 与 @kb/core 是两个互相独立的包，装谁就能解析谁 ——
- * 所以只能从「当前项目」（也就是你跑 kb init 的地方）解析，解析不到就拿 core 的版本兜底。
- */
-function resolveSite(): { dir: string; version: string } | null {
-  try {
-    const require = createRequire(path.join(process.cwd(), 'package.json'))
-    const pkgPath = require.resolve('@kb/site/package.json')
-    return {
-      dir: path.dirname(pkgPath),
-      version: JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version as string,
-    }
-  } catch {
-    return null
-  }
-}
 
 type InitArgs = { _: string[]; [k: string]: string | boolean | string[] }
 
@@ -50,8 +37,8 @@ function parseArgs(argv: string[]): InitArgs {
     else if (a === '--force') out.force = true
     else if (a === '--name') out.name = argv[++i]
     else if (a === '--collection') out.collection = argv[++i]
-    else if (a === '--content-root') out.contentRoot = argv[++i]
     else if (a === '--port') out.port = argv[++i]
+    else if (a === '--chroma-port') out.chromaPort = argv[++i]
     else if (a === '--local') out.local = argv[++i]
     else out._.push(a)
   }
@@ -64,9 +51,10 @@ const sanitize = (s: string) =>
 const str = (v: unknown, fallback: string) => (typeof v === 'string' && v ? v : fallback)
 
 /** 依赖写法：--local 时指向本地基座，否则写版本号 */
-function buildDeps(local: string | undefined, siteVersion: string) {
+function buildDeps(local: string | undefined) {
   if (!local) {
-    return { '@kb/core': `^${CORE_VERSION}`, '@kb/site': `^${siteVersion}` }
+    // 两个包同仓库、同版本发布，都取 @kb/core 自己的版本
+    return { '@kb/core': `^${CORE_VERSION}`, '@kb/site': `^${CORE_VERSION}` }
   }
   const base = path.resolve(process.cwd(), local)
   if (!fs.existsSync(path.join(base, 'packages/core'))) {
@@ -78,7 +66,7 @@ function buildDeps(local: string | undefined, siteVersion: string) {
   }
 }
 
-function instancePackageJson(name: string, local: string | undefined, siteVersion: string) {
+function instancePackageJson(name: string, local: string | undefined) {
   return {
     name,
     private: true,
@@ -87,17 +75,20 @@ function instancePackageJson(name: string, local: string | undefined, siteVersio
       dev: 'kb dev',
       build: 'kb build',
       preview: 'kb preview',
+      // 与 dev 同类：纯 kb 子命令，但日常最高频，给个短名字
+      index: 'kb index',
+      'index:full': 'kb index --full',
       'test:rag': 'kb eval',
       'test:rag:full': 'kb eval --full',
       'test:rag:baseline': 'kb eval:baseline',
-      'chroma:start':
-        'docker run -d -p 8000:8000 --name chroma -v ./data/chroma:/data chromadb/chroma:latest',
-      'chroma:stop': 'docker stop chroma && docker rm chroma',
-      'ollama:pull-chat': 'ollama pull qwen3:8b',
-      'ollama:pull-embed': 'ollama pull bge-m3',
-      'ollama:stop': 'ollama stop qwen3:8b && ollama stop bge-m3:latest',
+      // 交给基座：容器名按实例区分（不然本地两个实例会互相顶掉），端口取自 knowledge.config.mjs
+      'chroma:start': 'kb chroma:start',
+      'chroma:stop': 'kb chroma:stop',
+      // 交给基座：模型名取自 knowledge.config.mjs（不然改了配置还在拉旧模型）
+      'ollama:pull': 'kb ollama:pull',
+      'ollama:stop': 'kb ollama:stop',
     },
-    dependencies: buildDeps(local, siteVersion),
+    dependencies: buildDeps(local),
     devDependencies: {
       vitepress: '^1.6.4',
       vue: '^3.5.0',
@@ -114,10 +105,7 @@ function writeConfig(target: string, o: Record<string, string>) {
 export default {
   name: ${JSON.stringify(o.name)},
 
-  // 内容根目录：相对本文件，或绝对路径（可指向仓库外，笔记不必搬进来）
-  contentRoot: ${JSON.stringify(o.contentRoot)},
-
-  // 索引范围（glob）
+  // 索引范围（glob）——内容固定放在实例根下的 docs/
   index: {
     include: ['**/*.md'],
     // index.md / getting-started 是站点的元信息（首页与上手文），不算知识正文
@@ -148,76 +136,55 @@ export default {
     hybrid: { enabled: true, candidates: 50, vectorWeight: 0.7, bm25Weight: 0.3 },
   },
 
-  // 向量库：默认本地 Chroma；远程 / 云给 url + tokenEnv
+  // 向量库：默认本地 Chroma；远程 / 云给 url + tokenEnv（给了 url 就不再用本地容器）
   chroma: {
     host: 'localhost',
-    port: 8000,
+    // 端口要和"本实例自己的容器"一致；kb init 会挑一个没被占用的，
+    // 所以本地起第二个实例时不会和第一个撞车
+    port: ${o.chromaPort},
     // 远程示例：url: 'https://xxx.chromadb.cloud', tokenEnv: 'CHROMA_TOKEN', tenant: 'xxx', database: 'xxx'
   },
   port: ${o.port},
   envFile: './.env',
 
-  // 目录名 → 分类显示名（评估统计用）；留空则按目录名原样
+  // 目录名 → 显示名（不写就按目录名，连字符/下划线转空格并首字母大写）
   categories: {},
 
   // 站点（docs/.vitepress 消费）
   site: {
-    dir: './docs',
     title: ${JSON.stringify(o.name)},
     description: '基于本地大模型的 RAG 知识库',
-    // 无手写 sidebar 时按内容目录自动生成
-    autoSidebar: true,
-    // 顶部导航：也是「仅本地」的唯一来源 —— 带 onlyLocal 的项线上隐藏，
-    // 且其路径会被排除出编译 / sidebar / 死链检查（目录或文件自动识别）。
-    // nav: [
-    //   { text: '首页', link: '/' },
-    //   { text: '分组', items: [{ text: 'A', link: '/a/' }, { text: 'B', link: '/b/' }] },
-    //   { text: '私人笔记', link: '/private/x', onlyLocal: 'private' },
-    // ],
+
+    // 社交链接：把 https://github.com/你的用户名/你的仓库 换成你自己的，然后解开这行的注释。
+    // 配了之后，右上角图标和首页 hero 的 GitHub 按钮会**同时**出现（没配就都不出现）。
+    // socialLinks: [{ icon: 'github', link: 'https://github.com/你的用户名/你的仓库' }],
+
+    // 「仅本地」的内容路径（相对 docs/，可省略 .md）—— 这是**内容策略**：
+    // 列在这里的目录/文件只在本地产出（线上不构建、不进菜单、不进侧边栏）。
+    // onlyLocal: ['私人笔记', 'resume', 'service/roadmap.md'],
+
+    // 菜单与侧边栏默认按目录推导：
+    //   一级目录 = 一个菜单项；同一层有 ≥2 篇页面就给它一份侧边栏。
+    // 想完全接管，跑 \`pnpm kb menu:export\` 生成 menu.config.mjs 再改。
   },
 }
 `,
   )
 }
 
+/**
+ * 首页来自模板 `templates/instance/docs/index.md`（随骨架一起被 cpSync 复制过来），
+ * 这里只把 `{{name}}` 换成实例名。想改首页长什么样，改模板文件，别改这里。
+ */
 function writeHome(target: string, o: Record<string, string>) {
-  fs.mkdirSync(path.join(target, o.contentRoot), { recursive: true })
-  fs.writeFileSync(
-    path.join(target, o.contentRoot, 'index.md'),
-    `---
-layout: home
-
-hero:
-  name: ${o.name}
-  text: 本地知识库 + AI 问答
-  tagline: 把你的 Markdown 笔记变成可浏览、可搜索、可对话的网站
-  actions:
-    - theme: brand
-      text: 快速上手
-      link: /getting-started/
-    - theme: alt
-      text: 示例文档
-      link: /example/hello
----
-
-## 三步跑起来
-
-\`\`\`bash
-pnpm install          # 1. 装依赖
-pnpm chroma:start     # 2. 启动向量库（需 Docker；用本地模型前先 ollama pull）
-pnpm kb index         # 3. 建立索引
-pnpm dev              # 启动 → http://localhost:5173
-\`\`\`
-
-> 第一次用？看 **[快速上手](/getting-started/)**。
-`,
-  )
+  const file = path.join(target, CONTENT_DIR, 'index.md')
+  const src = fs.readFileSync(file, 'utf-8')
+  // 用函数形式替换：实例名里若有 $& 之类的字符不会被当成替换模式
+  fs.writeFileSync(file, src.replaceAll('{{name}}', () => o.name), 'utf-8')
 }
 
 export async function runInit(argv: string[]): Promise<void> {
   const args = parseArgs(argv)
-  const site = resolveSite()
-  const siteVersion = site?.version ?? CORE_VERSION
 
   const interactive = !args.yes && process.stdin.isTTY
   const rl = interactive ? readline.createInterface({ input: process.stdin, output: process.stdout }) : null
@@ -240,47 +207,38 @@ export async function runInit(argv: string[]): Promise<void> {
 
     const defaults = {
       name: str(args.name, path.basename(abs)),
-      contentRoot: str(args.contentRoot, './docs'),
       collection: str(args.collection, sanitize(path.basename(abs))),
       port: str(args.port, '3000'),
     }
+    // 向量库端口：默认挑一个没被占用的 —— 本地起第二个实例时就不会和第一个撞车
+    //（容器名已经按实例区分了，端口也得分开）
+    const chromaPort = str(args.chromaPort, '') || String(await findFreePort(8000))
     const o = {
       name: await ask('知识库名称', defaults.name),
-      contentRoot: await ask('内容目录', defaults.contentRoot),
       collection: await ask('向量集合名', defaults.collection),
       port: await ask('服务端口', defaults.port),
+      chromaPort,
     }
 
     console.log(`\n生成实例 → ${abs}`)
     fs.mkdirSync(abs, { recursive: true })
+    // 骨架自包含（含快速上手文章），不依赖任何已安装的包
     fs.cpSync(TEMPLATE, abs, { recursive: true })
-
-    // 「快速上手」文章由 @kb/site 提供（唯一来源），避免骨架里再存一份
-    if (site) {
-      const starter = path.join(site.dir, 'templates/getting-started/index.md')
-      if (fs.existsSync(starter)) {
-        const destDir = path.join(abs, o.contentRoot, 'getting-started')
-        fs.mkdirSync(destDir, { recursive: true })
-        fs.copyFileSync(starter, path.join(destDir, 'index.md'))
-      }
-    } else {
-      console.log('⚠️  当前项目里没有 @kb/site，跳过「快速上手」文章（先装 @kb/site 可自动带上）')
-    }
 
     fs.writeFileSync(
       path.join(abs, 'package.json'),
-      JSON.stringify(instancePackageJson(o.name, str(args.local, '') || undefined, siteVersion), null, 2) + '\n',
+      JSON.stringify(instancePackageJson(o.name, str(args.local, '') || undefined), null, 2) + '\n',
     )
     writeConfig(abs, o)
     writeHome(abs, o)
 
     console.log('\n✅ 完成。')
     console.log(`   knowledge.config.mjs   （实例配置）`)
-    console.log(`   ${o.contentRoot}/                     （内容目录 + 示例文档 + 快速上手）`)
+    console.log(`   ${CONTENT_DIR}/               （你的内容 + 首页 + 快速上手）`)
     console.log(`\n后续步骤：`)
     console.log(`   cd ${target}`)
     console.log('   pnpm install')
-    console.log('   pnpm chroma:start          # 启动向量库（需 Docker）')
+    console.log(`   pnpm chroma:start          # 启动本实例自己的向量库容器（端口 ${chromaPort}，需 Docker）`)
     console.log('   ollama pull qwen3:8b && ollama pull bge-m3')
     console.log('   pnpm kb index              # 建立索引')
     console.log('   pnpm dev                   # 启动（文档 5173 / API 3000）')

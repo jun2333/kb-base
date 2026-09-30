@@ -13,8 +13,7 @@
   },
   "files": [
     "theme",
-    "config",
-    "templates"
+    "config"
   ],
   "dependencies": {
     "highlight.js": "^11.11.1",

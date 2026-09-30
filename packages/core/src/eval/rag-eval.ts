@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { getRetriever } from '../rag/retriever.js'
 import { config } from '../config/index.js'
-import { finalize, printCompare, warnIfCasesChanged } from './eval-utils.js'
+import { finalize, printCompare, warnIfCasesChanged, requireCasesFile } from './eval-utils.js'
 
 // 检索质量回归测试集：数据在 eval/retrieval-cases.json（与逻辑分离，便于扩充/维护）。
 // 指标口径：
@@ -13,7 +13,7 @@ import { finalize, printCompare, warnIfCasesChanged } from './eval-utils.js'
 type EvalCase = { q: string; expect: string[]; category: string }
 
 // 测试集路径由实例配置提供（evalDir）
-const CASES_PATH = path.join(config.evalDir, 'retrieval-cases.json')
+const CASES_PATH = requireCasesFile(path.join(config.evalDir, 'retrieval-cases.json'), '检索评估集（retrieval-cases.json）')
 const cases: EvalCase[] = JSON.parse(fs.readFileSync(CASES_PATH, 'utf-8'))
 
 const TOP_K = 5

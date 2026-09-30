@@ -1,17 +1,11 @@
 // 一个知识库实例的配置类型。
 // 数据来源：仓库根的 knowledge.config.mjs（用 @type {import(...).KnowledgeConfig} 引用本文件）。
 
-/** 顶部导航项（site.nav）；也是「仅本地」的唯一来源 */
+/** 菜单项（menu.config.mjs 的 nav） */
 export type NavItem = {
   text?: string
   link?: string
   items?: NavItem[]
-  /**
-   * 仅本地：线上隐藏，且路径被排除出编译 / sidebar / 死链检查。
-   * - 字符串/数组：要排除的路径（目录或文件，相对内容根，自动识别，可省略 .md）
-   * - true：仅隐藏菜单，路径按该项 link 推导
-   */
-  onlyLocal?: boolean | string | string[]
 }
 
 /** 模型端点：可指向本地 Ollama（默认）或任意 OpenAI 兼容服务 */
@@ -21,21 +15,18 @@ export type ModelSpec =
       model?: string
       /** 服务地址（OpenAI 兼容，通常以 /v1 结尾） */
       baseUrl?: string
-      /** 直接给 API Key；更推荐 apiKeyEnv 从环境变量读，避免入库 */
-      apiKey?: string
-      /** 从哪个环境变量读取 API Key（远程服务用） */
+      /** 从哪个环境变量读取 API Key（远程服务用）。密钥本身放 .env，这里只写变量名，避免入库 */
       apiKeyEnv?: string
     }
 
-/** 向量库连接：默认本地 Chroma；远程 / 云可给 url + token */
+/** 向量库连接：默认本地 Chroma；远程 / 云可给 url + tokenEnv */
 export type ChromaSpec = {
   /** 完整地址（优先于 host/port）；远程或云服务用这个 */
   url?: string
   host?: string
   port?: number
   ssl?: boolean
-  /** 直接给 token；更推荐 tokenEnv 从环境变量读 */
-  token?: string
+  /** 从哪个环境变量读取 token。token 本身放 .env，这里只写变量名，避免入库 */
   tokenEnv?: string
   tenant?: string
   database?: string
@@ -53,6 +44,8 @@ export type ResolvedModel = {
 /** 解析后的向量库连接 */
 export type ResolvedChroma = {
   url: string
+  /** 本地容器端口（kb chroma:start 用它）。配了远程 url 时为 undefined */
+  port?: number
   token?: string
   tenant?: string
   database?: string
@@ -62,8 +55,6 @@ export type ResolvedChroma = {
 export type KnowledgeConfig = {
   /** 实例名（仅用于展示 / 日志） */
   name?: string
-  /** 内容根目录：相对配置文件，或绝对路径（可指向仓库外） */
-  contentRoot: string
   /** 索引范围（glob 模式） */
   index: { include?: string[]; exclude?: string[] }
   /** 数据目录：index-manifest / chroma / eval-history / eval-baseline */
@@ -111,16 +102,13 @@ export type KnowledgeConfig = {
   categories?: Record<string, string>
   /** 站点配置（docs/.vitepress 消费） */
   site?: {
-    /** 站点根目录（含 .vitepress 的目录），相对配置文件 */
-    dir?: string
     title?: string
     description?: string
-    /** 顶部导航；既是菜单，也是「仅本地」的唯一来源 */
-    nav?: NavItem[]
-    /** 手写 sidebar（覆盖自动生成），key 为路径前缀如 '/guide/' */
-    manualSidebar?: Record<string, unknown>
-    /** 是否对未手写的目录自动生成 sidebar（模板默认 true；个人实例可关闭以保留精修 sidebar） */
-    autoSidebar?: boolean
+    /**
+     * 「仅本地」的内容路径（相对内容根，可省 .md）——这是**内容策略**，与菜单配置无关。
+     * 列在这里的目录/文件**只在本地产出**：线上不构建、不进菜单、不进侧边栏、不算死链。
+     */
+    onlyLocal?: string[]
     /** AI 助手调用的后端地址（默认按 port 拼 http://localhost:<port>） */
     apiBase?: string
     /** 社交链接（页脚/侧栏图标），透传给 VitePress themeConfig.socialLinks */
@@ -142,7 +130,7 @@ export type KnowledgeConfig = {
  */
 export type ResolvedConfig = {
   name: string
-  /** 内容根目录绝对路径（旧名 docsPath，保持兼容） */
+  /** 内容根目录绝对路径（固定为 <实例根>/docs；旧名 docsPath，保持兼容） */
   docsPath: string
   /** 数据目录绝对路径 */
   dataDir: string
@@ -170,11 +158,9 @@ export type ResolvedConfig = {
   envFile: string
   categories: Record<string, string>
   site: {
-    dir: string
     title: string
     description: string
-    nav: NavItem[]
-    manualSidebar: Record<string, unknown>
-    autoSidebar: boolean
+    /** 仅本地路径（线上不构建、不进菜单/侧边栏） */
+    onlyLocal: string[]
   }
 }

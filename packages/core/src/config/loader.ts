@@ -10,6 +10,13 @@ import type { KnowledgeConfig, ResolvedConfig } from './types.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CONFIG_FILENAME = 'knowledge.config.mjs'
 
+/**
+ * 内容根 / 站点根：固定为实例根下的 `docs/`（唯一入口，不可配置）。
+ * 之所以不让它可配：内容外置是伪需求（笔记搬进来更自然），而"两个根"会带来
+ * 一堆配置错配（内容文件该放哪、srcDir 指向哪），认知负担远大于收益。
+ */
+export const CONTENT_DIR = 'docs'
+
 /** 从某目录向上查找配置文件 */
 function searchUp(startDir: string): string | undefined {
   let dir = startDir
@@ -82,25 +89,25 @@ export async function loadConfig(): Promise<ResolvedConfig> {
         ollamaNative: isOllama(sharedBaseUrl),
       }
     }
-    const s = spec as { model?: string; baseUrl?: string; apiKey?: string; apiKeyEnv?: string }
+    const s = spec as { model?: string; baseUrl?: string; apiKeyEnv?: string }
     const baseUrl = s.baseUrl ?? sharedBaseUrl
-    const apiKey = s.apiKey ?? (s.apiKeyEnv ? process.env[s.apiKeyEnv] ?? '' : sharedApiKey)
+    // 密钥只从环境变量读（.env 或真实环境），配置里只写变量名 —— 不提供"直接写密钥"的入口
+    const apiKey = s.apiKeyEnv ? (process.env[s.apiKeyEnv] ?? '') : sharedApiKey
     return { baseUrl, model: s.model ?? fallbackModel, apiKey, ollamaNative: isOllama(baseUrl) }
   }
 
   // ---------- 向量库：默认本地 Chroma，也支持远程 / 云（url + token） ----------
   const chromaRaw = raw.chroma ?? {}
-  const chromaToken = chromaRaw.token ?? (chromaRaw.tokenEnv ? process.env[chromaRaw.tokenEnv] ?? '' : '')
+  // token 只从环境变量读（.env / 真实环境），配置里只写变量名 —— 不提供"直接写 token"的入口
+  const chromaToken = chromaRaw.tokenEnv ? (process.env[chromaRaw.tokenEnv] ?? '') : ''
+  const chromaPort = posInt(process.env.CHROMA_PORT, chromaRaw.port ?? 8000)
   const chromaUrl =
     chromaRaw.url ??
-    `${chromaRaw.ssl ? 'https' : 'http'}://${process.env.CHROMA_HOST || chromaRaw.host || 'localhost'}:${posInt(
-      process.env.CHROMA_PORT,
-      chromaRaw.port ?? 8000,
-    )}`
+    `${chromaRaw.ssl ? 'https' : 'http'}://${process.env.CHROMA_HOST || chromaRaw.host || 'localhost'}:${chromaPort}`
 
   return {
     name: raw.name ?? 'knowledge-base',
-    docsPath: abs(raw.contentRoot ?? './docs'),
+    docsPath: abs(CONTENT_DIR),
     dataDir: abs(raw.dataDir ?? './data'),
     evalDir: abs(raw.evalDir ?? './eval'),
     indexInclude: raw.index?.include ?? ['**/*.md'],
@@ -118,6 +125,8 @@ export async function loadConfig(): Promise<ResolvedConfig> {
     hybridBm25Weight: raw.retrieval?.hybrid?.bm25Weight ?? 0.3,
     chroma: {
       url: chromaUrl,
+      // 写了 url 就是连远程/云，本地容器没有意义 → 不保留 port
+      port: chromaRaw.url ? undefined : chromaPort,
       token: chromaToken || undefined,
       tenant: chromaRaw.tenant,
       database: chromaRaw.database,
@@ -126,12 +135,9 @@ export async function loadConfig(): Promise<ResolvedConfig> {
     envFile,
     categories: raw.categories ?? {},
     site: {
-      dir: site.dir ?? './docs',
       title: site.title ?? '知识库',
       description: site.description ?? '个人知识库',
-      nav: site.nav ?? [],
-      manualSidebar: site.manualSidebar ?? {},
-      autoSidebar: site.autoSidebar ?? false,
+      onlyLocal: site.onlyLocal ?? [],
     },
   }
 }

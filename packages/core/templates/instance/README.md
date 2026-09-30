@@ -8,8 +8,7 @@
 
 ```bash
 pnpm install
-pnpm ollama:pull-chat     # 下载聊天模型（首次，约 5.2GB）
-pnpm ollama:pull-embed    # 下载向量模型（首次，约 1.2GB）
+pnpm ollama:pull          # 下载本地模型（聊天 + 向量，配的是远程模型会自动跳过）
 pnpm chroma:start         # 启动向量库（需 Docker 在运行）
 pnpm kb index             # 建立向量索引
 pnpm dev                  # 启动（文档 5173 / API 3000）
@@ -21,17 +20,29 @@ pnpm dev                  # 启动（文档 5173 / API 3000）
 
 ## 放你自己的内容
 
-- 内容目录由 `knowledge.config.mjs` 的 `contentRoot` 指定（默认 `./docs`）
-- **笔记不必搬进来**：`contentRoot` 支持绝对路径，可以直接指向你已有的笔记目录
-- **目录即分类**：每建一个目录，导航与侧边栏自动多一块
+- **把你的 Markdown 放进 `docs/`** —— 内容固定就放这里（一个目录，没有别的概念）
+- **目录即分类**：一级目录自动成为菜单一项；**同一层有 ≥2 篇页面**就自动有一份侧边栏
+- 菜单/侧边栏想分组、改顺序、加外链 → `pnpm kb menu:export` 生成 `menu.config.mjs` 后自己改
 - 改完内容后跑 `pnpm kb index` 更新索引（增量，很快）
+
+## 已有笔记怎么搬进来
+
+站点右下角的 **➕「内容管理」**（本地开发时才显示）两步搞定：
+
+1. **导入**：拖入 Markdown 或选一个文件夹 → 先看预检（会新增哪些分类、哪些重名、哪些被忽略）→ 确认
+   文件先落在 `docs/imported/`（收件箱），**你原来的目录不动**
+2. **归档**：在面板里勾选（或整份目录拖拽）分配到右侧分类；分类就是 `docs/` 下的目录
+
+只支持 `.md`；图片不会被一起搬。命令行也可以：`pnpm kb import <目录> --dry-run`。
+
+> 导入 / 归档后记得**更新索引**（面板里有按钮），否则 AI 还搜不到新内容。
 
 ## 常用命令
 
 | 命令 | 作用 |
 |------|------|
 | `pnpm dev` | 启动前后端 |
-| `pnpm kb index` | 增量更新索引（`pnpm kb index --full` 全量重建） |
+| `pnpm index` | 增量更新索引（`pnpm index:full` 全量重建） |
 | `pnpm build` | 构建静态站点（生产） |
 | `pnpm chroma:stop` | 停止向量库 |
 

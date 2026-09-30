@@ -1,3 +1,81 @@
+/* === 共享 UI 基础设施：遮罩层 / toast ===
+   批注、AI 助手、内容管理各面板**不再各写一份遮罩样式**，统一用 .kb-overlay；
+   层级也集中在这里定义，避免每个组件各写一个 z-index 互相打架。 */
+:root {
+  --kb-z-overlay: 999;   /* 面板遮罩（面板本体在 1001+） */
+  --kb-z-dialog: 2000;   /* 对话框类遮罩（要盖住面板） */
+  --kb-z-toast: 4000;    /* 提示永远在最上层 */
+}
+
+.kb-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.15);
+  z-index: var(--kb-z-overlay);
+}
+
+/* 对话框类：更重的遮罩 + 居中（用于「加批注」这类必须先处理的小窗） */
+.kb-overlay-dialog {
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--kb-z-dialog);
+}
+
+/* 右上角 toast：固定在整个网页右上角，从右侧滑入，几秒后自动消失，点击可立即关掉。
+   多条垂直排列（flex 列 + gap），不会重叠。 */
+.kb-toasts {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  left: auto;
+  margin: 0;
+  z-index: var(--kb-z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  /* 默认宽度：固定的，文字超长就换行撑高，而不是撑宽 */
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.kb-toast {
+  pointer-events: auto;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 14px;
+  border: 1px solid var(--vp-c-divider);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--vp-c-bg-elv);
+  color: var(--vp-c-text-1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+  line-height: 1.55;
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.kb-toast-success { border-left-color: var(--vp-c-brand-1); }
+.kb-toast-warn { border-left-color: var(--vp-c-warning-1, #d97706); }
+.kb-toast-error { border-left-color: var(--vp-c-danger-1, #dc2626); }
+.kb-toast-info { border-left-color: var(--vp-c-divider); }
+
+.kb-toast-enter-active,
+.kb-toast-leave-active,
+.kb-toast-move {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.kb-toast-enter-from,
+.kb-toast-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
 /* 隐藏 mermaid 代码块的 copy 按钮和语言标签 */
 .vp-doc .language-mermaid > button.copy,
 .vp-doc .language-mermaid > span.lang {

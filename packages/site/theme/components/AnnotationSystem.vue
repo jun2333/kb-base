@@ -14,7 +14,7 @@
     
     <!-- 批注输入对话框 -->
     <Transition name="dialog-fade">
-      <div v-if="showDialog" class="annotation-dialog-overlay" @click.self="closeDialog">
+      <div v-if="showDialog" class="kb-overlay kb-overlay-dialog" @click.self="closeDialog">
         <div class="annotation-dialog">
           <div class="dialog-header">
             <h3>添加批注</h3>
@@ -52,7 +52,7 @@
     
     <!-- 编辑批注对话框 -->
     <Transition name="dialog-fade">
-      <div v-if="showEditDialog && editingAnnotation" class="annotation-dialog-overlay" @click.self="closeEditDialog">
+      <div v-if="showEditDialog && editingAnnotation" class="kb-overlay kb-overlay-dialog" @click.self="closeEditDialog">
         <div class="annotation-dialog">
           <div class="dialog-header">
             <h3>编辑批注</h3>
@@ -121,7 +121,7 @@
     <div class="annotation-panel">
       <!-- 遮罩层 -->
       <Transition name="fade">
-        <div v-if="showPanel" class="annotation-overlay" @click="showPanel = false" />
+        <div v-if="showPanel" class="kb-overlay" @click="showPanel = false" />
       </Transition>
 
       <button 
@@ -183,6 +183,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useData } from 'vitepress'
 import { useAnnotations } from '../composables/useAnnotations'
 import { usePanelState } from '../composables/usePanelState.js'
+import { toast } from '../composables/useToast.ts'
 
 const { isBlocked, tryOpen, close: closePanel } = usePanelState('annotation')
 
@@ -494,23 +495,9 @@ function deleteAnnotationById(id) {
   showToast('批注已删除')
 }
 
+/** 统一走右上角的共享 toast（样式与宿主见 ToastHost.vue / custom.css） */
 function showToast(message) {
-  // 创建临时提示
-  const toast = document.createElement('div')
-  toast.className = 'annotation-toast'
-  toast.textContent = message
-  document.body.appendChild(toast)
-  
-  setTimeout(() => {
-    toast.classList.add('show')
-  }, 10)
-  
-  setTimeout(() => {
-    toast.classList.remove('show')
-    setTimeout(() => {
-      document.body.removeChild(toast)
-    }, 300)
-  }, 2000)
+  toast(message, 'success')
 }
 
 function copyAnnotationsToClipboard() {
@@ -563,20 +550,7 @@ function clearSelection() {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-/* 对话框 */
-.annotation-dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-}
-
+/* 对话框（遮罩与层级见 custom.css 的 .kb-overlay / .kb-overlay-dialog） */
 .annotation-dialog {
   background: white;
   border-radius: 8px;
@@ -783,17 +757,6 @@ function clearSelection() {
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
   border-bottom: 6px solid white;
-}
-
-/* 遮罩层 */
-.annotation-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.15);
-  z-index: 999;
 }
 
 /* 批注面板 */
@@ -1027,29 +990,6 @@ function clearSelection() {
   font-size: 12px;
   margin-top: 8px;
   color: #bbb;
-}
-
-/* Toast 提示 */
-.annotation-toast {
-  position: fixed;
-  top: 80px;
-  left: 50%;
-  transform: translateX(-50%) translateY(-20px);
-  background: #3eaf7c;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  opacity: 0;
-  transition: all 0.3s ease;
-  z-index: 9999;
-}
-
-.annotation-toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }
 
 /* 过渡动画 */

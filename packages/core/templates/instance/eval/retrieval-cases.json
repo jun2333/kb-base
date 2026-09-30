@@ -1,7 +1,0 @@
-[
-  {
-    "q": "示例文档讲了什么？",
-    "expect": ["example/hello.md"],
-    "category": "示例"
-  }
-]

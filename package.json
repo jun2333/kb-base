@@ -9,7 +9,6 @@
   },
   "scripts": {
     "typecheck": "pnpm -r typecheck",
-    "build": "pnpm -r build",
-    "sync:starter": "node scripts/sync-starter.mjs"
+    "build": "pnpm -r build"
   }
 }

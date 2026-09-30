@@ -6,7 +6,7 @@ import { createChatClient } from '../config/clients.js'
 import { createTools } from '../agent/tools.js'
 import { runAgentLoop } from '../agent/loop.js'
 import { SYSTEM_PROMPT } from '../agent/prompt.js'
-import { finalize, printCompare } from './eval-utils.js'
+import { finalize, printCompare, requireCasesFile } from './eval-utils.js'
 
 // 报告与测试集路径由实例配置提供（dataDir / evalDir）
 const REPORT_PATH = path.join(config.dataDir, 'gen-eval-report.md')
@@ -15,7 +15,7 @@ const REPORT_PATH = path.join(config.dataDir, 'gen-eval-report.md')
 // expectAnswer=false 的题是"负例"——知识库答不了，模型必须如实说没有，不能编造。
 type GenCase = { q: string; category: string; expectAnswer: boolean }
 
-const CASES_PATH = path.join(config.evalDir, 'generation-cases.json')
+const CASES_PATH = requireCasesFile(path.join(config.evalDir, 'generation-cases.json'), '生成层评估集（generation-cases.json）')
 const cases: GenCase[] = JSON.parse(fs.readFileSync(CASES_PATH, 'utf-8'))
 
 const client = createChatClient()

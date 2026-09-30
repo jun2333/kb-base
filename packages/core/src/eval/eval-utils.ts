@@ -46,8 +46,41 @@ function fmt(value: number, metric: string): string {
 
 const ensureDataDir = () => fs.mkdirSync(DATA_DIR, { recursive: true })
 
+/**
+ * 内置默认阈值（实例可以放 eval/thresholds.json 覆盖）。
+ * 之所以内置：评估是**基座自己校准质量**用的，实例不该为了跑评估而必须准备文件；
+ * 阈值是"底线"不是"目标"，留了余量（当前项目 Hit@1 约 90%，底线 80%）。
+ */
+const DEFAULT_THRESHOLDS: Record<EvalKind, Threshold[]> = {
+  retrieval: [
+    { metric: 'hit1', min: 0.8, label: 'Hit@1' },
+    { metric: 'recall5', min: 0.88, label: 'Recall@5' },
+    { metric: 'mrr', min: 0.85, label: 'MRR' },
+  ],
+  generation: [
+    { metric: 'citationLegalRate', min: 1.0, label: '引用合法性' },
+    { metric: 'faithfulness', min: 4.0, label: '忠实度均分' },
+  ],
+}
+
 function readThresholds(): Record<EvalKind, Threshold[]> {
-  return JSON.parse(fs.readFileSync(THRESHOLDS_PATH, 'utf-8'))
+  try {
+    return JSON.parse(fs.readFileSync(THRESHOLDS_PATH, 'utf-8'))
+  } catch {
+    return DEFAULT_THRESHOLDS
+  }
+}
+
+/** 评估集缺失时的友好提示（裸 ENOENT 对刚 clone / 刚 init 的人太不友好） */
+export function requireCasesFile(pathname: string, what: string): string {
+  if (fs.existsSync(pathname)) return pathname
+  console.error(`\n❌ 未找到${what}：${pathname}\n`)
+  console.error('   评估集是**基座侧**用来校准检索/回答质量的，实例不需要自己准备。')
+  console.error('   确实想跑的话，两种办法：')
+  console.error(`     • 让它基于你的内容自动出题：kb cases:gen${what.includes('生成') ? '' : ' + kb cases:review'}`)
+  console.error('     • 或参考 @kb/core 的 eval/REVIEW-PLAYBOOK.md 手写一份')
+  console.error('')
+  process.exit(1)
 }
 
 /** 读取历史记录（按 kind 过滤，保持追加顺序） */

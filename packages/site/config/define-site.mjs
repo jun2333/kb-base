@@ -2,17 +2,18 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitepress'
-import { buildAutoSidebar } from './sidebar.mjs'
-import { buildNav, buildAutoNav, collectLocalPaths } from './nav.mjs'
+import { buildNav } from './nav.mjs'
+import { buildDefaultMenu } from './menu.mjs'
 import { resolveLocalEntries, deriveLocalOnly } from './local-only.mjs'
 
 // 基座：由「实例配置」生成 VitePress 站点配置。
-// 实例的 docs/.vitepress/config.mts 只需几行：defineSite({ config, manualSidebar, metaUrl })。
+// 实例的 docs/.vitepress/config.mts 只需几行：defineSite({ config, menu, metaUrl })。
 //
 // 约定：
-// - 内容根 = config.contentRoot（相对配置文件），可与站点根不同（内容外置）
-// - nav = config.site.nav（唯一来源）；带 onlyLocal 的项线上隐藏，并派生 srcExclude / sidebar 过滤 / 死链忽略
-// - sidebar = config.site.autoSidebar ? 自动生成 + 手写覆盖 : 纯手写
+// - 内容根 = 站点根 = 实例根下的 docs/（固定，不可配）
+// - 菜单/侧边栏 = menu.config.mjs（有就完全按它，没有就按目录推导）；带 onlyLocal 的项线上隐藏，并派生 srcExclude / sidebar 过滤 / 死链忽略
+// - 首页 hero 的 GitHub 按钮从 site.socialLinks 派生（首页模板不写死仓库地址）
+
 
 const CONFIG_FILENAME = 'knowledge.config.mjs'
 
@@ -25,6 +26,16 @@ function findConfigDir(startDir) {
     if (parent === dir) return undefined
     dir = parent
   }
+}
+
+/**
+ * 首页 hero 的 GitHub 按钮：**从 `site.socialLinks` 派生**，不写死在首页里。
+ * 这样"仓库地址"只有一处配置，却同时喂了两处展示（右上角图标 + 首页按钮）。
+ * @returns {{ theme: string, text: string, link: string } | null}
+ */
+function githubHeroAction(site) {
+  const link = (site.socialLinks ?? []).find((s) => s?.icon === 'github')?.link
+  return typeof link === 'string' && link ? { theme: 'alt', text: 'GitHub', link } : null
 }
 
 /** 生产环境过滤掉「仅本地」的 sidebar 分组与链接 */
@@ -50,17 +61,19 @@ function filterSidebar(sidebar, { excludeLocal, sidebarKeys, links }) {
 
 /**
  * @param {{
- *   config: Record<string, any>,     // knowledge.config.mjs 的 default 导出
- *   manualSidebar?: Record<string, any>, // 实例手写 sidebar（sidebar.manual.mts）
- *   metaUrl?: string,                // 传 import.meta.url；用于推断 siteRoot
- *   siteRoot?: string,               // 或显式指定站点根（含 .vitepress 的目录）
+ *   config: Record<string, any>,   // knowledge.config.mjs 的 default 导出
+ *   menu?: { nav?: any[], sidebar?: Record<string, any> } | null,
+ *                                  // menu.config.mjs 的内容（实例的 config.mts 用顶层 await 读它）
+ *                                  // 缺省 = 走默认行为（按目录推导）
+ *   metaUrl?: string,              // 传 import.meta.url；用于推断 siteRoot
+ *   siteRoot?: string,             // 或显式指定站点根（含 .vitepress 的目录）
  *   mode?: 'dev' | 'prod',
  *   includeLocal?: boolean,
  * }} options
  */
 export function defineSite({
   config = {},
-  manualSidebar = {},
+  menu = null,
   metaUrl,
   siteRoot: siteRootOption,
   mode = 'prod',
@@ -74,23 +87,19 @@ export function defineSite({
   const site = config.site ?? {}
   const categories = config.categories ?? {}
 
-  // 内容根可与站点根不同（内容外置时用 srcDir 指过去）
-  const contentRoot = path.resolve(configDir, config.contentRoot ?? './docs')
-  const srcDir = contentRoot === path.resolve(siteRoot) ? undefined : contentRoot
+  // 内容根 = 站点根（固定为实例根下的 docs/）
+  const contentRoot = path.resolve(siteRoot)
 
-  // nav 是「仅本地」的唯一来源
-  const navSource =
-    Array.isArray(site.nav) && site.nav.length > 0
-      ? site.nav
-      : buildAutoNav({ contentRoot, labels: categories })
+  // 菜单与侧边栏：有 menu.config.mjs 就**完全按它来**（不做兜底），否则按目录推导
+  const effective = menu ?? buildDefaultMenu({ contentRoot, labels: categories })
+  const navSource = effective.nav ?? []
+  const sidebarData = effective.sidebar ?? {}
 
-  const derived = deriveLocalOnly(resolveLocalEntries(collectLocalPaths(navSource), contentRoot))
+  // 「仅本地」= 内容策略，来自 knowledge.config.mjs 的 site.onlyLocal（与菜单配置解耦）
+  const derived = deriveLocalOnly(resolveLocalEntries(site.onlyLocal ?? [], contentRoot))
 
-  const sidebarData = site.autoSidebar
-    ? { ...buildAutoSidebar({ contentRoot, exclude: derived.dirs, labels: categories }), ...manualSidebar }
-    : manualSidebar
-
-  const nav = buildNav(navSource, { excludeLocal })
+  // link 落在仅本地路径下的菜单项，线上隐藏（分组会被裁掉/提升）
+  const nav = buildNav(navSource, { excludeLocal, hiddenPrefixes: derived.prefixes })
 
   const L = { excludeLocal, sidebarKeys: derived.sidebarKeys, links: derived.links }
 
@@ -112,8 +121,6 @@ export function defineSite({
     title: site.title ?? '知识库',
     description: site.description ?? '个人知识库',
 
-    ...(srcDir ? { srcDir } : {}),
-
     // GitHub Pages 等子路径部署时由 BASE_PATH 注入（构建期写死进产物）
     base: process.env.BASE_PATH || '/',
 
@@ -134,6 +141,24 @@ export function defineSite({
       socialLinks: site.socialLinks ?? [],
       footer: site.footer ?? { message: '', copyright: '' },
       kb,
+    },
+
+    /**
+     * 首页 hero 支持从配置派生 action：
+     * 配了 `site.socialLinks` 里的 github，就自动给 `layout: home` 的页面补一个 GitHub 按钮
+     * —— 首页模板里因此不用写死仓库地址。（已自带 GitHub 按钮的页面不会被重复加。）
+     */
+    transformPageData(pageData) {
+      if (pageData.frontmatter?.layout !== 'home') return
+      const action = githubHeroAction(site)
+      if (!action) return
+
+      const hero = (pageData.frontmatter.hero ??= {})
+      const actions = (hero.actions ??= [])
+      const hasGithub = actions.some(
+        (a) => a?.link === action.link || /github/i.test(String(a?.text ?? '')),
+      )
+      if (!hasGithub) actions.push(action)
     },
 
     vite: {

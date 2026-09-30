@@ -1,16 +1,17 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-// 「仅本地」内容的派生（单一来源：site.nav 里带 onlyLocal 的项）。
-// nav 是唯一配置入口：标记了 onlyLocal 的项既在线上隐藏，其路径也用于
-// srcExclude / sidebar 过滤 / 死链忽略——不用再单独维护一份 localOnly 列表。
-
-/** '/service/roadmap' → 'service/roadmap'（去掉首尾斜杠） */
-export function linkToPath(link) {
-  return String(link ?? '')
-    .replace(/^\/+/, '')
-    .replace(/\/+$/, '')
-}
+// 「仅本地」内容的派生。
+//
+// 唯一来源：knowledge.config.mjs 的 `site.onlyLocal: ['目录或文件', ...]`
+// —— 这是**内容策略**（哪些内容不进线上构建），与"菜单怎么排"（menu.config.mjs）是两件事。
+//
+// 派生出来的四份东西：
+//   paths        → VitePress 的 srcExclude（生产不构建，URL 访问不到）
+//   prefixes     → nav 过滤：link 落在这些前缀下的菜单项线上隐藏
+//   sidebarKeys  → 侧边栏分组过滤（目录级）
+//   links        → 侧边栏条目过滤（文件级）
+//   deadLinks    → 忽略"指向已排除内容"的死链
 
 /**
  * 把路径解析为 { path, isFile } 条目，自动区分目录 / 文件。
@@ -48,8 +49,8 @@ export function deriveLocalOnly(entries = []) {
   return {
     // 生产环境不构建的路径（目录 → dir/**，文件 → 原路径）
     paths: entries2.map((i) => (i.isFile ? i.path : `${i.path}/**`)),
-    // 仅本地目录名（自动 sidebar 用）
-    dirs: entries2.filter((i) => !i.isFile).map((i) => i.path),
+    // nav 过滤用的前缀（'/resume'、'/service/roadmap'）
+    prefixes: entries2.map(slug),
     // 生产环境忽略的死链（其他文章指向"已排除内容"）
     deadLinks: entries2.map((i) => new RegExp(`^${slug(i)}${i.isFile ? '' : '\\/'}`)),
     // sidebar：目录级分组 key 与文件级链接

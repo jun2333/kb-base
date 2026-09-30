@@ -3,16 +3,25 @@ import path from 'node:path'
 
 // 自动 sidebar 生成器（基座）。
 // 扫描内容根目录，按「目录 → 分组、文件 → 条目」生成 VitePress sidebar，
-// 供没有手写 sidebar 的新实例开箱即用。手写部分见 sidebar.manual.mts。
+// 供没有 menu.config.mjs 的新实例开箱即用（有配置文件时完全按配置，不调用这里）。
 //
 // 约定：
-//   - 顶层目录 → 一个 sidebar key（`/dir/`）
+//   - 同一层有 ≥2 篇页面 → 该层一个 sidebar key（`/dir/`）
 //   - 目录内 .md → 条目（标题取 frontmatter title，回退 h1，再回退文件名）
 //   - 子目录 → 折叠的嵌套分组
 // 不引入额外依赖（手写 frontmatter / h1 轻量解析）。
 
 /** 不作为知识内容的目录（跳过） */
 export const IGNORED_DIRS = new Set(['node_modules', '.vitepress', '.git', 'public', 'dist'])
+
+/**
+ * 基座约定目录的默认显示名（实例的 categories 可覆盖）。
+ * 只放"基座自己造出来的目录"，不猜用户的目录名。
+ */
+export const DEFAULT_LABELS = {
+  imported: '待归档', // 导入的收件箱：有内容时才出现在导航里，方便预览
+  'getting-started': '快速上手',
+}
 
 /** 是否为可纳入导航的内容目录 */
 export function isContentDir(name) {
@@ -29,20 +38,50 @@ export function listContentDirs(dir) {
 }
 
 /**
- * @param {{ contentRoot?: string, exclude?: string[], labels?: Record<string, string> }} options
+ * 默认 sidebar：**同一层有 ≥2 篇页面，就给它一份 sidebar**（任意层级都算）。
+ *
+ * 规则一句话：sidebar 出现在"有并列内容可导航"的地方。
+ *   - 一级目录下直接放 11 篇 → 给一份（列出这 11 篇）
+ *   - 一级目录下是 4 个子目录 → 各自给自己的（进子目录就聚焦子目录；父层也能看到折叠组）
+ *   - 只有 1 篇的目录 → 不给（一条的导航没有意义）
+ *
+ * VitePress 按"最长匹配前缀"选 key，所以子目录的 key 会覆盖父目录的 key。
+ *
+ * @param {{ contentRoot?: string, labels?: Record<string, string> }} options
  * @returns {Record<string, unknown[]>} VitePress sidebar 对象
  */
-export function buildAutoSidebar({ contentRoot, exclude = [], labels = {} } = {}) {
+export function buildAutoSidebar({ contentRoot, labels = {} } = {}) {
   const sidebar = {}
   if (!contentRoot || !fs.existsSync(contentRoot)) return sidebar
 
-  for (const name of listContentDirs(contentRoot)) {
-    if (exclude.includes(name)) continue
-    const items = collect(path.join(contentRoot, name), `/${name}/`)
-    if (items.length > 0) {
-      sidebar[`/${name}/`] = [{ text: labels[name] ?? humanize(name), items }]
+  const walk = (dir, prefix, segs) => {
+    let entries
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+
+    // 同级直接放了几篇 md？≥2 才给这个目录一份 sidebar
+    // （内容根本身不算：首页和站点说明页是"站点级页面"，给它们挂侧边栏很怪）
+    const directMd = entries.filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.md')).length
+    if (segs.length > 0 && directMd >= 2) {
+      const items = collect(dir, prefix)
+      if (items.length >= 2) {
+        const name = segs[segs.length - 1] ?? ''
+        sidebar[prefix] = [{ text: labels[name] ?? DEFAULT_LABELS[name] ?? humanize(name), items }]
+      }
+    }
+
+    // 继续下钻（子目录各自成 key）
+    for (const e of entries) {
+      if (e.isDirectory() && isContentDir(e.name)) {
+        walk(path.join(dir, e.name), `${prefix}${e.name}/`, [...segs, e.name])
+      }
     }
   }
+
+  walk(contentRoot, '/', [])
   return sidebar
 }
 
