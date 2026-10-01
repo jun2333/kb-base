@@ -1,6 +1,6 @@
 {
   "name": "@minijun/kb-site",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "本地知识库基座：VitePress 主题、批注与 AI 组件、站点配置派生",
   "license": "MIT",

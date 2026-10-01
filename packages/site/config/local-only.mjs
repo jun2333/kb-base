@@ -15,7 +15,7 @@ import path from 'node:path'
 
 /**
  * 把路径解析为 { path, isFile } 条目，自动区分目录 / 文件。
- * 支持写 'algorithms'（目录）、'service/roadmap.md'（文件）、'service/roadmap'（自动补 .md）。
+ * 支持写 '私人笔记'（目录）、'notes/draft.md'（文件）、'notes/draft'（自动补 .md）。
  * @param {string[]} rawPaths 相对 contentRoot 的路径
  * @param {string} contentRoot
  */
@@ -49,7 +49,7 @@ export function deriveLocalOnly(entries = []) {
   return {
     // 生产环境不构建的路径（目录 → dir/**，文件 → 原路径）
     paths: entries2.map((i) => (i.isFile ? i.path : `${i.path}/**`)),
-    // nav 过滤用的前缀（'/resume'、'/service/roadmap'）
+    // nav 过滤用的前缀（形如 '/私人笔记'、'/notes/draft'）
     prefixes: entries2.map(slug),
     // 生产环境忽略的死链（其他文章指向"已排除内容"）
     deadLinks: entries2.map((i) => new RegExp(`^${slug(i)}${i.isFile ? '' : '\\/'}`)),

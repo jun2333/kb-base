@@ -1,6 +1,6 @@
 {
   "name": "@minijun/kb-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "本地知识库基座：RAG 引擎 + Agent + 评估框架 + CLI",
   "license": "MIT",

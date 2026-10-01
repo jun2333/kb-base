@@ -42,10 +42,10 @@ async function loadLocalOnly() {
   }>
 }
 
-/**
- * --check 用的"仅本地"前缀过滤器（'/interview-questions'、'/service/roadmap'）。
- * 这些内容**本来就不该出现在菜单配置里**，报成"缺失"只会淹没真正的差异。
- */
+  /**
+   * --check 用的"仅本地"前缀过滤器（形如 '/私人笔记'、'/notes/draft'）。
+   * 这些内容**本来就不该出现在菜单配置里**，报成"缺失"只会淹没真正的差异。
+   */
 async function localOnlyPrefixes(): Promise<string[]> {
   const raw = config.site.onlyLocal ?? []
   if (raw.length === 0) return []

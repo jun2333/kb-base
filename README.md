@@ -66,6 +66,7 @@ kb-base/
 ## `kb` CLI 命令
 
 `kb init [目录]` · `kb import <目录>` · `kb index [--full]` · `kb menu:export [--check|--force]` ·
+`kb chroma:start` · `kb chroma:stop` · `kb ollama:pull` · `kb ollama:stop` ·
 `kb dev` · `kb serve` · `kb build` · `kb preview` ·
 `kb eval [--full]` · `kb eval:baseline` · `kb cases:gen` · `kb cases:review`
 
