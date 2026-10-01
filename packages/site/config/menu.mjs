@@ -12,7 +12,8 @@ import { buildAutoNav } from './nav.mjs'
 //
 // 默认行为（约定大于配置）：
 //   一级目录 = 菜单项（名字取目录名，链接到该目录默认页：index.md，没有就取第一篇）
-//   同一层有 ≥2 篇页面 = 该层有 sidebar（任意层级都算；只有 1 篇的不给）
+//   一级目录 ≥2 条内容 = 该目录一份 sidebar（整棵子树都在里面，子目录只是嵌套分组；
+//   子目录不单独成 key —— 否则最长前缀匹配会让父侧边栏在点进子目录时整棵消失）
 
 /** 菜单配置文件名（实例根，与 knowledge.config.mjs 平级） */
 export const MENU_FILE = 'menu.config.mjs'

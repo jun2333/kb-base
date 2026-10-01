@@ -6,9 +6,9 @@ import path from 'node:path'
 // 供没有 menu.config.mjs 的新实例开箱即用（有配置文件时完全按配置，不调用这里）。
 //
 // 约定：
-//   - 同一层有 ≥2 篇页面 → 该层一个 sidebar key（`/dir/`）
+//   - **只有一级目录**会给一份 sidebar key（`/dir/`），整棵子树都在这份里
 //   - 目录内 .md → 条目（标题取 frontmatter title，回退 h1，再回退文件名）
-//   - 子目录 → 折叠的嵌套分组
+//   - 子目录 → 嵌套分组（默认展开）
 // 不引入额外依赖（手写 frontmatter / h1 轻量解析）。
 
 /** 不作为知识内容的目录（跳过） */
@@ -38,14 +38,16 @@ export function listContentDirs(dir) {
 }
 
 /**
- * 默认 sidebar：**同一层有 ≥2 篇页面，就给它一份 sidebar**（任意层级都算）。
+ * 默认 sidebar：**每个一级目录一份，整棵子树都在里面**（≥2 条可导航内容才给）。
  *
- * 规则一句话：sidebar 出现在"有并列内容可导航"的地方。
- *   - 一级目录下直接放 11 篇 → 给一份（列出这 11 篇）
- *   - 一级目录下是 4 个子目录 → 各自给自己的（进子目录就聚焦子目录；父层也能看到折叠组）
- *   - 只有 1 篇的目录 → 不给（一条的导航没有意义）
+ * 规则一句话：只在"一级目录"这一层切侧边栏。
+ *   - 进 `服务端` 的任意一篇文章（含它的子目录）→ 左侧始终是**完整的那棵树**
+ *   - 子目录只是树里的嵌套分组，**不再单独成 key**
+ *   - 只有 1 条内容的目录 → 不给（一条的导航没有意义）
  *
- * VitePress 按"最长匹配前缀"选 key，所以子目录的 key 会覆盖父目录的 key。
+ * ⚠️ 为什么不给子目录单独注册 key：VitePress 按"最长匹配前缀"选 key，
+ * 子目录的 key 会**覆盖**父目录的 key —— 于是点进子目录时整棵父侧边栏会消失、
+ * 只剩子目录那几条（视觉上像"跳到了另一个页面"，还会丢失上下文）。
  *
  * @param {{ contentRoot?: string, labels?: Record<string, string> }} options
  * @returns {Record<string, unknown[]>} VitePress sidebar 对象
@@ -54,34 +56,16 @@ export function buildAutoSidebar({ contentRoot, labels = {} } = {}) {
   const sidebar = {}
   if (!contentRoot || !fs.existsSync(contentRoot)) return sidebar
 
-  const walk = (dir, prefix, segs) => {
-    let entries
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
-
-    // 同级直接放了几篇 md？≥2 才给这个目录一份 sidebar
-    // （内容根本身不算：首页和站点说明页是"站点级页面"，给它们挂侧边栏很怪）
-    const directMd = entries.filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.md')).length
-    if (segs.length > 0 && directMd >= 2) {
-      const items = collect(dir, prefix)
-      if (items.length >= 2) {
-        const name = segs[segs.length - 1] ?? ''
-        sidebar[prefix] = [{ text: labels[name] ?? DEFAULT_LABELS[name] ?? humanize(name), items }]
-      }
-    }
-
-    // 继续下钻（子目录各自成 key）
-    for (const e of entries) {
-      if (e.isDirectory() && isContentDir(e.name)) {
-        walk(path.join(dir, e.name), `${prefix}${e.name}/`, [...segs, e.name])
-      }
-    }
+  for (const name of listContentDirs(contentRoot)) {
+    const items = collect(path.join(contentRoot, name), `/${name}/`)
+    // ≥2 条才给：1 条的话侧边栏里就孤零零一项，不如不给
+    // （子目录里的页面会跟着父目录这一份，所以「只有子目录」的目录也不会漏）
+    if (items.length < 2) continue
+    sidebar[`/${name}/`] = [
+      { text: labels[name] ?? DEFAULT_LABELS[name] ?? humanize(name), items },
+    ]
   }
 
-  walk(contentRoot, '/', [])
   return sidebar
 }
 
@@ -109,13 +93,13 @@ function collect(dir, prefix) {
     items.push({ text: titleOf(path.join(dir, f.name), f.name), link: `${prefix}${slug}` })
   }
 
-  // 子目录：嵌套为折叠分组
+  // 子目录：嵌套分组（默认展开 —— 折叠会让"这层还有东西"变得不明显）
   const dirs = entries
     .filter((e) => e.isDirectory() && isContentDir(e.name))
     .sort((a, b) => a.name.localeCompare(b.name))
   for (const d of dirs) {
     const sub = collect(path.join(dir, d.name), `${prefix}${d.name}/`)
-    if (sub.length > 0) items.push({ text: humanize(d.name), collapsed: true, items: sub })
+    if (sub.length > 0) items.push({ text: humanize(d.name), items: sub })
   }
 
   return items
